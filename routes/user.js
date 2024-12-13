@@ -1,245 +1,260 @@
 const { User } = require('../models/user');
+const Course = require('../models/course'); // Import Course model
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
-const  {google} = require('googleapis')
-const {OAuth2} = google.auth;
+const mongoose = require('mongoose');
+const { google } = require('googleapis');
+const { OAuth2 } = google.auth;
 
-const client = new OAuth2('920213136950-8j3ng8qursis2pib3qhav9q2larqfu89.apps.googleusercontent.com')
+const client = new OAuth2(process.env.GOOGLE_CLIENT_ID); // Use environment variable for security
 
-const FILE_TYPE_MAP = {
-    'image/png': 'png',
-    'image/jpeg': 'jpeg',
-    'image/jpg': 'jpg'
+// Middleware to validate "other" field
+const validateOtherField = (value) => {
+    const allowedValues = ["Lord Ikaw na bahala", "Makakapasa this Sem", "Keri pa bes"];
+    return !value || allowedValues.includes(value);
 };
 
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        const isValid = FILE_TYPE_MAP[file.mimetype];
-        let uploadError = new Error('invalid image type');
-
-        if (isValid) {
-            uploadError = null;
-        }
-        cb(uploadError, 'public/uploads');
-    },
-    filename: function (req, file, cb) {
-        const fileName = file.originalname.split(' ').join('-');
-        const extension = FILE_TYPE_MAP[file.mimetype];
-        cb(null, `${fileName}-${Date.now()}.${extension}`);
-    }
-});
-
-const tokenBlacklist = []; 
-
-const uploadOptions = multer({ storage: storage });
-router.get(`/`, async (req, res) => {
-    // const userList = await User.find();
-    const userList = await User.find().select('-passwordHash');
-    console.log(userList)
-
-    if (!userList) {
-        res.status(500).json({ success: false })
-    }
-    res.send(userList);
-})
-
-
-router.get('/:id', async (req, res) => {
-    const user = await User.findById(req.params.id).select('-passwordHash');
-
-    if (!user) {
-        res.status(500).json({ message: 'The user with the given ID was not found.' })
-    }
-    res.status(200).send(user);
-})
-
-
-//User Register
-router.post('/', async (req, res) => {
-    const { password, name, email, phone, isAdmin } = req.body;
-
-    // Validate that a password is provided
-    if (!password) {
-        return res.status(400).send('Password is required');
-    }
-
-    const saltRounds = 10;
-    const salt = bcrypt.genSaltSync(saltRounds);
-    const passwordHash = bcrypt.hashSync(password, salt);
-
-    let user = new User({
-        name,
-        email,
-        passwordHash,
-        phone,
-        isAdmin,
-    });
-
+// Get all users with course details
+router.get('/', async (req, res) => {
     try {
-        user = await user.save();
-        res.send(user);
+        const userList = await User.find()
+            .populate({
+                path: 'course',
+                populate: [{ path: 'department' }, { path: 'organization' }]
+            })
+            .select('-passwordHash');
+        res.status(200).json(userList);
     } catch (error) {
-        res.status(400).send('The user cannot be created!');
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// Get user by ID
+router.get('/:id', async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id).populate('course').select('-passwordHash');
+        if (!user) return res.status(404).json({ message: 'User not found.' });
+
+        res.status(200).json(user);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
     }
 });
 
 
-router.put('/:id', async (req, res) => {
-
-    const userExist = await User.findById(req.params.id);
-    let newPassword
-    if (req.body.password) {
-        newPassword = bcrypt.hashSync(req.body.password, 10)
-    } else {
-        newPassword = userExist.passwordHash;
-    }
-
-    const user = await User.findByIdAndUpdate(
-        req.params.id,
-        {
-            name: req.body.name,
-            email: req.body.email,
-            passwordHash: newPassword,
-            phone: req.body.phone,
-            isAdmin: req.body.isAdmin,
-            street: req.body.street,
-            apartment: req.body.apartment,
-            zip: req.body.zip,
-            city: req.body.city,
-            country: req.body.country,
-        },
-        { new: true }
-    )
-
-    if (!user)
-        return res.status(400).send('the user cannot be created!')
-
-    res.send(user);
-})
-
-
-//users login
-router.post('/login', async (req, res) => {
-    console.log(req.body.email)
-    const user = await User.findOne({ email: req.body.email })
-
-    const secret = process.env.secret;
-    if (!user) {
-        return res.status(400).send('The user not found');
-    }
-
-    if (user && bcrypt.compareSync(req.body.password, user.passwordHash)) {
-        const token = jwt.sign(
-            {
-                userId: user.id,
-                isAdmin: user.isAdmin
-            },
-            secret,
-            { expiresIn: '1d' }
-        )
-
-        res.status(200).send({ user: user.email, token: token })
-    } else {
-        res.status(400).send('password is wrong!');
-    }
-
-
-})
-
+// Google login
 router.post('/google_login', async (req, res) => {
     try {
         const { tokenId } = req.body;
+
         const verify = await client.verifyIdToken({
             idToken: tokenId,
-            audience: "405532974722-t5a0lvua754v8jkc1lc4uvtkv305ghtm.apps.googleusercontent.com"
+            audience: process.env.GOOGLE_CLIENT_ID,
         });
 
         const { email_verified, email, name } = verify.payload;
 
         if (!email_verified) {
-            return res.status(400).json({ msg: "Email verification failed." });
+            return res.status(400).json({ message: "Email verification failed" });
         }
 
         let user = await User.findOne({ email });
 
         if (!user) {
-            user = new User({ name, email });
+            // New user, initialize with null course
+            user = new User({
+                name,
+                email,
+                course: null,
+                other: [],
+            });
+            await user.save();
+        } else if (!user.name) {
+            // Update missing name if not already set
+            user.name = name;
             await user.save();
         }
 
+        const isProfileComplete = user.course !== null; // Profile is incomplete if course is null
+
         const token = jwt.sign(
-            {
-                userId: user._id, // use _id from MongoDB
-                isAdmin: user.isAdmin
-            },
-            process.env.JWT_SECRET, // Using environment variable for JWT secret
-            { expiresIn: process.env.JWT_EXPIRES_TIME } // Using environment variable for token expiration
+            { userId: user._id, isAdmin: user.isAdmin },
+            process.env.JWT_SECRET,
+            { expiresIn: process.env.JWT_EXPIRES_TIME }
         );
 
-        // Return the JWT token along with user information
-        res.status(200).json({ msg: "Login successful", user, token });
-    } catch (err) {
-        console.error(err);
-        return res.status(500).json({ msg: err.message });
+        res.status(200).json({
+            message: 'Login successful',
+            user,
+            token,
+            isProfileComplete,
+        });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
     }
 });
 
-// router.post('/register', async (req, res) => {
-//     let user = new User({
-//         name: req.body.name,
-//         email: req.body.email,
-//         passwordHash: bcrypt.hashSync(req.body.password, 10),
-//         phone: req.body.phone,
-//         isAdmin: req.body.isAdmin
-//     })
-//     user = await user.save();
 
-//     if (!user)
-//         return res.status(400).send('the user cannot be created!')
+// Update user data
+router.put('/:id', async (req, res) => {
+    try {
+        const { name, email, course, other } = req.body;
 
-//     res.send(user);
-// })
-
-
-router.delete('/:id', (req, res) => {
-    User.findByIdAndRemove(req.params.id).then(user => {
-        if (user) {
-            return res.status(200).json({ success: true, message: 'the user is deleted!' })
-        } else {
-            return res.status(404).json({ success: false, message: "user not found!" })
+        // Validate optional "other" field
+        if (other && !validateOtherField(other)) {
+            return res.status(400).json({ message: "Invalid value for 'other' field." });
         }
-    }).catch(err => {
-        return res.status(500).json({ success: false, error: err })
-    })
-})
 
-router.get(`/get/count`, async (req, res) => {
-    const userCount = await User.countDocuments((count) => count)
+        // Prepare update fields
+        const updateData = {
+            name,
+            email,
+            other: other || [] // Default to empty array if 'other' is not provided
+        };
 
-    if (!userCount) {
-        res.status(500).json({ success: false })
+        // If course ID is provided, validate it and populate it
+        if (course) {
+            if (!mongoose.Types.ObjectId.isValid(course)) {
+                return res.status(400).json({ message: "Invalid course ID." });
+            }
+
+            const courseData = await Course.findById(course);
+            if (!courseData) {
+                return res.status(404).json({ message: "Course not found." });
+            }
+
+            updateData.course = courseData._id; // Save only the course ID
+        }
+
+        // Find and update the user
+        const user = await User.findByIdAndUpdate(req.params.id, updateData, { new: true })
+            .populate('course'); // Populate the course field after update
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        res.status(200).json(user);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
     }
-    res.send({
-        userCount: userCount
-    });
-})
-
-router.post('/logout', (req, res) => {
-    const authHeader = req.header('Authorization');
-
-    if (!authHeader) {
-        return res.status(400).json({ message: 'Authorization header missing' });
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-
-    // Add the token to a blacklist (for demonstration purposes, this is an array)
-    // tokenBlacklist.push(token);
-
-    res.status(200).json({ message: 'User logged out successfully' });
 });
+
+
+// Delete user
+router.delete('/:id', async (req, res) => {
+    try {
+        const user = await User.findByIdAndRemove(req.params.id);
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        res.status(200).json({ success: true, message: 'User deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error deleting user', error: error.message });
+    }
+});
+
+// Get user count
+router.get('/get/count', async (req, res) => {
+    try {
+        const userCount = await User.countDocuments();
+        res.status(200).json({ userCount });
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching user count', error: error.message });
+    }
+});
+
+// Get the currently logged-in user's data without middleware
+// router.get('/me', async (req, res) => {
+//     try {
+//       const token = req.header('Authorization')?.replace('Bearer ', ''); // Get token from Authorization header
+  
+//       if (!token) {
+//         return res.status(400).json({ message: 'Token is required.' });
+//       }
+  
+//       const decoded = jwt.verify(token, process.env.JWT_SECRET); // Verify the token
+//       const userId = decoded.userId; // Extract the userId from the token
+  
+//       const user = await User.findById(userId).populate({
+//         path: 'course',
+//         populate: [{ path: 'department' }, { path: 'organization' }],
+//       });
+  
+//       if (!user) {
+//         return res.status(404).json({ message: 'User not found.' });
+//       }
+  
+//       res.status(200).json(user); // Return the full user object
+//     } catch (error) {
+//       res.status(500).json({ message: 'Error fetching user data', error: error.message });
+//     }
+//   });
+router.get('/me', async (req, res) => {
+    try {
+      const token = req.header('Authorization')?.replace('Bearer ', '');
+  
+      if (!token) {
+        return res.status(400).json({ message: 'Authorization token is required.' });
+      }
+  
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const userId = decoded.userId;
+  
+      const user = await User.findById(userId).select('name'); // Only retrieve `name`
+  
+      if (!user) {
+        return res.status(404).json({ message: 'User not found.' });
+      }
+  
+      res.status(200).json({ name: user.name }); // Only send necessary data
+    } catch (error) {
+      if (error.name === 'TokenExpiredError') {
+        return res.status(401).json({ message: 'Session expired. Please log in again.' });
+      }
+      if (error.name === 'JsonWebTokenError') {
+        return res.status(401).json({ message: 'Invalid token.' });
+      }
+      res.status(500).json({ message: 'Internal server error', error: error.message });
+    }
+  });
+
+router.get('/google_details', async (req, res) => {
+    try {
+        const tokenId = req.header('Authorization')?.replace('Bearer ', ''); // Get token from Authorization header
+
+        if (!tokenId) {
+            return res.status(400).json({ message: 'Token is required.' });
+        }
+
+        // Verify the token ID with Google
+        const verify = await client.verifyIdToken({
+            idToken: tokenId,
+            audience: process.env.GOOGLE_CLIENT_ID, // Ensure the token matches the client ID
+        });
+
+        const { email_verified, email, name } = verify.payload;
+
+        if (!email_verified) {
+            return res.status(400).json({ message: 'Email verification failed' });
+        }
+
+        // Log the user's name to the terminal
+        console.log(`Logged-in user: ${name}`);
+
+        // Respond with token details and user information
+        res.status(200).json({
+            tokenId,
+            email,
+            name,
+        });
+
+    } catch (error) {
+        res.status(500).json({ message: 'Error retrieving Google login details', error: error.message });
+    }
+});
+
 
 module.exports = router;

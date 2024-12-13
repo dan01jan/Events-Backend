@@ -1,7 +1,8 @@
 // const expressjwt = require('express-jwt');
 const { expressjwt: jwt } = require("express-jwt");
+
 function authJwt() {
-    const secret = process.env.secret;
+    const secret = process.env.JWT_SECRET;
     const api = process.env.API_URL;
     return jwt({
         secret,
@@ -19,37 +20,29 @@ function authJwt() {
                     url: /\/api\/v1\/questionnaires(.*)/,
                     methods: ['GET', 'POST', 'PUT', 'DELETE','OPTIONS']
                 },
-                // {
-                //     url: /\/api\/v1\/brands(.*)/,
-                //     methods: ['GET', 'POST', 'PUT', 'OPTIONS', 'DELETE']
-                // },
-                // {
-                //     url: /\/api\/v1\/categories(.*)/,
-                //     methods: ['GET', 'POST', 'PUT', 'OPTIONS', 'DELETE']
-                // },
-                // {
-                //     url: /\/api\/v1\/orders(.*)/,
-                //     methods: ['GET', 'POST', 'PUT', 'OPTIONS']
-                // },
-                // {
-                //     url: /\/public\/uploads(.*)/,
-                //     methods: ['GET', 'OPTIONS', 'POST', 'DELETE']
-                // },
+                {
+                    url: /\/api\/v1\/sentiments(.*)/,
+                    methods: ['GET', 'POST', 'OPTIONS']
+                },
+                {
+                    url: /\/api\/v1\/course(.*)/,
+                    methods: ['GET', 'POST', 'PUT', 'DELETE','OPTIONS']
+                },
                 `${api}/users`,
                 `${api}/users/login`,
                 `${api}/users/register`,
                 `${api}/users/logout`,
+                `${api}/users/google_login`,
+                `${api}/users/me`,
             ]
-        })
+        });
 }
 
 async function isRevoked(req, payload, done) {
     if (!payload.isAdmin) {
-        done(null, true)
+        done(null, true);
     }
     done();
 }
 
-
-
-module.exports = authJwt
+module.exports = authJwt;

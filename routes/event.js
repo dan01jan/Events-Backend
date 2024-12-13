@@ -1,210 +1,151 @@
 const express = require('express');
-const { Event } = require('../models/event');
 const router = express.Router();
-const mongoose = require('mongoose');
-const multer = require('multer');
+const { Event } = require('../models/event');
+const { User } = require('../models/user');
+const cloudinary = require('../utils/cloudinary');
+const uploadOptions = require('../utils/multer');
+const { Course } = require('../models/course');
+const moment = require('moment');
 
-const FILE_TYPE_MAP = {
-    'image/png': 'png',
-    'image/jpeg': 'jpeg',
-    'image/jpg': 'jpg'
+
+// Helper function to parse date and time strings
+const parseDateTime = (dateStr, timeStr) => {
+  const dateTime = moment(`${dateStr} ${timeStr}`, 'YYYY-MM-DD HH:mm');
+  if (!dateTime.isValid()) {
+    throw new Error('Invalid date or time format.');
+  }
+  return dateTime.toDate();
 };
 
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        const isValid = FILE_TYPE_MAP[file.mimetype];
-        let uploadError = new Error('invalid image type');
+router.post('/', uploadOptions.array('images', 10), async (req, res) => {
+  const files = req.files;
 
-        if (isValid) {
-            uploadError = null;
-        }
-        cb(uploadError, 'public/uploads');
-    },
-    filename: function (req, file, cb) {
-        const fileName = file.originalname.split(' ').join('-');
-        const extension = FILE_TYPE_MAP[file.mimetype];
-        cb(null, `${fileName}-${Date.now()}.${extension}`);
+  try {
+    const { name, dateStart, timeStart, dateEnd, timeEnd, location, description, userId, userName, organization } = req.body;
+
+    // Validate required fields
+    if (!name || !dateStart || !timeStart || !dateEnd || !timeEnd || !location || !description || !userId || !userName || !organization) {
+      return res.status(400).json({ success: false, message: 'All fields are required.' });
     }
-});
 
-const uploadOptions = multer({ storage: storage });
+    // Parse date and time inputs
+    const startDateTime = parseDateTime(dateStart, timeStart);
+    const endDateTime = parseDateTime(dateEnd, timeEnd);
 
-
-//Get All Events
-router.get(`/`, async (req, res) => {
-    try {
-        const events = await Event.find(); // Fetch all events from the database
-        if (!events) {
-            return res.status(404).json({ success: false, message: 'No events found' });
-        }
-        res.status(200).json(events); // Return all events
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-
-//Create Events
-router.post(`/`, async (req, res) => {
-    // const files = req.files;
-    // if (!files || files.length === 0) return res.status(400).send('No images in the request');
-
-    // let images = [];
-    // const basePath = `${req.protocol}://${req.get('host')}/public/uploads/`;
-
-    // files.forEach(file => {
-    //     const fileName = file.filename;
-    //     images.push(`${basePath}${fileName}`);
-    // });
-
+    // Create event object
     const event = new Event({
-        name: req.body.name,
-        description: req.body.description,
-        dateStart: req.body.dateStart,
-        dateEnd: req.body.dateEnd,
-        images: req.body.images,
+      name,
+      dateStart: startDateTime,
+      dateEnd: endDateTime,
+      location,
+      description,
+      userId,
+      userName,
+      organization,
     });
-   
+
+    // Save the event to the database
     const savedEvent = await event.save();
-
-    if (!savedEvent) return res.status(500).send('The event cannot be created');
-
-    res.send(savedEvent);
-});
-
-// router.put('/:id', uploadOptions.array('images', 10), async (req, res) => {
-//     console.log(req.body);
-//     if (!mongoose.isValidObjectId(req.params.id)) {
-//         return res.status(400).send('Invalid Brand Id');
-//     }
-
-//     const brand = await Brand.findById(req.params.id);
-//     if (!brand) return res.status(400).send('Invalid Product!');
-
-//     let images = brand.images; // Existing images
-
-//     const files = req.files;
-//     if (files && files.length > 0) {
-//         // If new images are uploaded, add them to the existing images array
-//         const basePath = `${req.protocol}://${req.get('host')}/public/uploads/`;
-//         const newImages = files.map(file => `${basePath}${file.filename}`);
-//         images = images.concat(newImages);
-//     }
-
-//     const updatedBrand = await Brand.findByIdAndUpdate(
-//         req.params.id,
-//         {
-//             name: req.body.name,
-//             description: req.body.description,
-//             images: images // Update images with the combined array of existing and new images
-//         },
-//         { new: true }
-//     );
-
-//     if (!updatedBrand) return res.status(500).send('the brand cannot be updated!');
-
-//     res.send(updatedBrand);
-// });
-
-//Event Update
-router.put('/:id', async (req, res) => {
-    if (!mongoose.isValidObjectId(req.params.id)) {
-        return res.status(400).send('Invalid Event ID');
+    if (!savedEvent) {
+      return res.status(500).json({ success: false, message: 'The event cannot be created.' });
     }
 
+    res.status(201).json({ success: true, event: savedEvent });
+  } catch (error) {
+    console.error('Error creating event:', error);
+    res.status(500).json({ success: false, message: 'An error occurred while creating the event.', error: error.message });
+  }
+});
+
+
+// GET all events
+router.get('/', async (req, res) => {
     try {
-        const updatedEvent = await Event.findByIdAndUpdate(
-            req.params.id,
-            {
-                name: req.body.name,
-                description: req.body.description,
-                dateStart: req.body.dateStart,
-                dateEnd: req.body.dateEnd,
-                images: req.body.images
-            },
-            { new: true } // This option returns the updated document
-        );
-
-        if (!updatedEvent) {
-            return res.status(404).json({ success: false, message: 'Event not found' });
-        }
-
-        res.status(200).json(updatedEvent);
+      const events = await Event.find().sort({ dateStart: -1 });
+      res.status(200).json({
+        success: true,
+        count: events.length,
+        data: events
+      });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({
+        success: false,
+        error: 'Server Error'
+      });
     }
-});
+  });
 
-//Event Delete
-router.delete('/:id', (req, res)=>{
-    Event.findByIdAndRemove(req.params.id).then(event =>{
-        if(event) {
-            return res.status(200).json({success: true, message: 'the event is deleted!'})
-        } else {
-            return res.status(404).json({success: false , message: "event not found!"})
-        }
-    }).catch(err=>{
-       return res.status(500).json({success: false, error: err}) 
-    })
-})
-
-
-//Event create feedback
-router.post('/:id/feedback', async (req, res) => {
+// Helper function to fetch a single event
+router.get('/:id', async (req, res) => {
+  try {
     const eventId = req.params.id;
-
-    if (!mongoose.isValidObjectId(eventId)) {
-        return res.status(400).send('Invalid Event ID');
-    }
-
-    // Find the event by its ID
     const event = await Event.findById(eventId);
+
     if (!event) {
-        return res.status(404).send('Event not found');
+      return res.status(404).json({ success: false, message: 'Event not found' });
     }
 
-    // Append new feedback to the feedback array
-    const feedback = {
-        user: req.body.user,
-        comment: req.body.comment
-    };
-
-    event.feedback.push(feedback);
-
-    try {
-        const updatedEvent = await event.save(); // Save the updated event with new feedback
-        res.status(200).json(updatedEvent); // Return the updated event data
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
+    res.status(200).json({ success: true, event });
+  } catch (error) {
+    console.error('Error fetching event:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
+// PUT route to update an event
+router.put('/:id', uploadOptions.array('images', 10), async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const event = await Event.findById(eventId);
 
-// router.put('/gallery-images/:id', uploadOptions.array('images', 10), async (req, res) => {
-//     if (!mongoose.isValidObjectId(req.params.id)) {
-//         return res.status(400).send('Invalid Product Id');
-//     }
-//     const files = req.files;
-//     let imagesPaths = [];
-//     const basePath = `${req.protocol}://${req.get('host')}/public/uploads/`;
+    if (!event) {
+      return res.status(404).json({ success: false, message: 'Event not found' });
+    }
 
-//     if (files) {
-//         files.map((file) => {
-//             imagesPaths.push(`${basePath}${file.filename}`);
-//         });
-//     }
+    // Handle image uploads if new images are provided
+    let newImageUrls = [];
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        const fileStr = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+        const result = await cloudinary.uploader.upload(fileStr, {
+          resource_type: 'auto',
+          public_id: `event-images/${Date.now()}-${file.originalname}`,
+        });
+        newImageUrls.push({
+          url: result.secure_url,
+          publicId: result.public_id,
+        });
+      }
+    }
 
-//     const brand = await Brand.findByIdAndUpdate(
-//         req.params.id,
-//         {
-//             images: imagesPaths
-//         },
-//         { new: true }
-//     );
-        
-//     if (!brand) return res.status(500).send('the gallery cannot be updated!');
+    // Combine existing images with new ones
+    const updatedImages = [...event.images, ...newImageUrls];
 
-//     res.send(brand);
-// });
+    // Parse date and time inputs
+    const dateStart = parseDateTime(req.body.dateStart, req.body.timeStart);
+    const dateEnd = parseDateTime(req.body.dateEnd, req.body.timeEnd);
 
-module.exports=router;
+    const updatedEvent = await Event.findByIdAndUpdate(
+      eventId,
+      {
+        name: req.body.name,
+        dateStart,
+        dateEnd,
+        location: req.body.location,
+        description: req.body.description,
+        images: updatedImages,
+        organization: req.body.organization,
+      },
+      { new: true }
+    );
+
+    res.status(200).json({ success: true, event: updatedEvent });
+  } catch (error) {
+    console.error('Error updating event:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+module.exports = router;
+
+module.exports = router;

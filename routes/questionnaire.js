@@ -19,14 +19,15 @@ router.post('/', async (req, res) => { // Removed authJwt()
     }
 });
 // Get all questionnaires
-router.get('/', async (req, res) => { // Removed authJwt()
+router.get('/', async (req, res) => { 
     try {
-        const questionnaires = await Questionnaire.find().populate('userId', 'name email'); // Optionally populate user info
+        const questionnaires = await Questionnaire.find(); // No populate, so user info is not included
         res.status(200).json(questionnaires);
     } catch (error) {
         res.status(500).json({ message: "Error retrieving questionnaires", error });
     }
 });
+
 
 // Get a specific questionnaire by ID
 router.get('/:id', async (req, res) => { // Removed authJwt()

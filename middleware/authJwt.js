@@ -12,6 +12,7 @@ function authJwt() {
             '/api/v1/users/login',
             '/api/v1/users/register',
             '/api/v1/users/google_login',
+            '/api/v1/users/google_details',
         ],
     });
 }

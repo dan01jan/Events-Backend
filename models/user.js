@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const Course = require('./course'); // Import the Course model
 
 const userSchema = new mongoose.Schema({
     name: {
@@ -9,13 +10,15 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
-    passwordHash: {
-        type: String,
+    course: {
+        type: mongoose.Schema.Types.ObjectId, // Reference to the Course model
+        ref: 'Course', // Specify the model that this field is referencing
         required: false,
     },
-    phone: {
-        type: String,
-        required: false,
+    other: {
+        type: [String], // Array of strings
+        enum: ["Lord Ikaw na bahala", "Makakapasa this Sem", "Keri pa bes"], // Predefined values
+        default: [] // Default is an empty array
     },
     isAdmin: {
         type: Boolean,
@@ -32,11 +35,3 @@ userSchema.set('toJSON', {
 });
 
 exports.User = mongoose.model('User', userSchema);
-
-
-// {   "name": "",
-//     "email": "",
-//     "passwordHash": "password",
-//     "phone": "0999992123",
-//     "isAdmin": true,
-// }

@@ -9,6 +9,7 @@ require("dotenv/config");
 
 
 app.use(cors());
+
 app.options("*", cors());
 
 //middleware
@@ -20,12 +21,12 @@ app.use("/public/uploads", express.static(__dirname + "/public/uploads"));
 
 
 //Routes
-// const categoriesRoutes = require("./routes/categories");
-// const productsRoutes = require("./routes/products");
 const usersRoutes = require("./routes/user");
-// const ordersRoutes = require("./routes/orders");
 const eventRoutes = require("./routes/event")
 const questionnaireRoutes = require('./routes/questionnaire');
+const sentimentRoutes = require("./routes/sentiment");
+const courseRoutes = require("./routes/course");
+
 
 const api = process.env.API_URL;
 
@@ -33,8 +34,10 @@ const api = process.env.API_URL;
 // app.use(`${api}/products`, productsRoutes);
 app.use(`${api}/users`, usersRoutes);
 app.use('/api/v1/questionnaires', questionnaireRoutes);
+app.use(`${api}/sentiments`, sentimentRoutes);
 // app.use(`${api}/orders`, ordersRoutes);
 app.use(`${api}/events`, eventRoutes);
+app.use(`${api}/course`, courseRoutes);
 app.get("/", (req, res) => {
   res.send("Server is running");
 });
