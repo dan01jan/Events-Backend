@@ -11,7 +11,7 @@ const imageSchema = new mongoose.Schema({
     dateStart: { type: Date, required: true },
     dateEnd: { type: Date, required: true },
     location: { type: String },
-    images: [imageSchema],  // Array of image objects
+    images: [imageSchema],
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     organization: { type: String, required: true },
     userName: { type: String }

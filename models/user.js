@@ -15,6 +15,10 @@ const userSchema = new mongoose.Schema({
         ref: 'Course', // Specify the model that this field is referencing
         required: false,
     },
+    organization: {
+        type: String, // The user's organization
+        required: false, 
+    },
     other: {
         type: [String], // Array of strings
         enum: ["Lord Ikaw na bahala", "Makakapasa this Sem", "Keri pa bes"], // Predefined values

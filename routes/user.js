@@ -44,6 +44,18 @@ router.get('/:id', async (req, res) => {
     }
 });
 
+router.get('/:userId', async (req, res) => {
+    try {
+      const user = await User.findById(req.params.userId);
+      if (!user) {
+        return res.status(404).send('User not found');
+      }
+      res.json(user);
+    } catch (err) {
+      res.status(500).send('Error fetching user');
+    }
+  });
+
 
 // Google login
 router.post('/google_login', async (req, res) => {
@@ -101,7 +113,7 @@ router.post('/google_login', async (req, res) => {
 // Update user data
 router.put('/:id', async (req, res) => {
     try {
-        const { name, email, course, other } = req.body;
+        const { name, email, course, organization, other } = req.body;
 
         // Validate optional "other" field
         if (other && !validateOtherField(other)) {
@@ -112,6 +124,7 @@ router.put('/:id', async (req, res) => {
         const updateData = {
             name,
             email,
+            organization,
             other: other || [] // Default to empty array if 'other' is not provided
         };
 

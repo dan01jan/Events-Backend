@@ -34,6 +34,8 @@ function authJwt() {
                 `${api}/users/logout`,
                 `${api}/users/google_login`,
                 `${api}/users/me`,
+                `${api}/users/:userId`,
+
             ]
         });
 }

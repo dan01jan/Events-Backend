@@ -5,17 +5,22 @@ const { User } = require('../models/user');
 const cloudinary = require('../utils/cloudinary');
 const uploadOptions = require('../utils/multer');
 const { Course } = require('../models/course');
-const moment = require('moment');
 
 
-// Helper function to parse date and time strings
 const parseDateTime = (dateStr, timeStr) => {
-  const dateTime = moment(`${dateStr} ${timeStr}`, 'YYYY-MM-DD HH:mm');
-  if (!dateTime.isValid()) {
+  const [year, month, day] = dateStr.split('-');
+  const [hours, minutes] = timeStr.split(':'); 
+
+  const dateTime = new Date(Date.UTC(year, month - 1, day, hours, minutes));
+
+  if (isNaN(dateTime)) {
     throw new Error('Invalid date or time format.');
   }
-  return dateTime.toDate();
+
+  return dateTime;
 };
+
+
 
 router.post('/', uploadOptions.array('images', 10), async (req, res) => {
   const files = req.files;
@@ -31,6 +36,20 @@ router.post('/', uploadOptions.array('images', 10), async (req, res) => {
     // Parse date and time inputs
     const startDateTime = parseDateTime(dateStart, timeStart);
     const endDateTime = parseDateTime(dateEnd, timeEnd);
+    
+    console.log("name", name);
+    console.log("dateStart", dateStart);
+    console.log("timeStart", timeStart);
+    console.log("dateEnd", dateEnd);
+    console.log("timeEnd", timeEnd);
+    console.log("location", location);
+    console.log("description", description);
+    console.log("userId", userId);
+    console.log("userName", userName);
+    console.log("organization", organization);
+    
+    console.log("bat parang mali",startDateTime)
+    console.log("ka", endDateTime)
 
     // Create event object
     const event = new Event({
@@ -56,7 +75,7 @@ router.post('/', uploadOptions.array('images', 10), async (req, res) => {
     res.status(500).json({ success: false, message: 'An error occurred while creating the event.', error: error.message });
   }
 });
-
+ 
 
 // GET all events
 router.get('/', async (req, res) => {
