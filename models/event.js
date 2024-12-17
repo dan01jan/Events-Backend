@@ -17,10 +17,6 @@ const imageSchema = new mongoose.Schema({
     userName: { type: String }
   });
   
-  
-  const Event = mongoose.model('Event', eventSchema);
-  
-  module.exports = { Event };
-  
+
 
 exports.Event = mongoose.model('Event', eventSchema);
