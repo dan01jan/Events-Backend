@@ -94,20 +94,21 @@ router.post('/', uploadOptions.array('images', 10), async (req, res) => {
 
 // GET all events
 router.get('/', async (req, res) => {
-    try {
-      const events = await Event.find().sort({ dateStart: -1 });
-      res.status(200).json({
-        success: true,
-        count: events.length,
-        data: events
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: 'Server Error'
-      });
-    }
-  });
+  try {
+    const events = await Event.find().sort({ dateStart: -1 });
+    res.status(200).json({
+      success: true,
+      count: events.length,
+      data: events
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Server Error'
+    });
+  }
+});
+
 
 // Helper function to fetch a single event
 router.get('/:id', async (req, res) => {
@@ -168,33 +169,35 @@ router.put('/:id', uploadOptions.array('images', 10), async (req, res) => {
     // Combine existing images with new ones
     const updatedImages = [...event.images, ...newImages];
 
-    // Parse date and time inputs if they are provided
-    let dateStart, dateEnd;
-    if (req.body.dateStart && req.body.timeStart) {
-      dateStart = parseDateTime(req.body.dateStart, req.body.timeStart);
-    }
-    if (req.body.dateEnd && req.body.timeEnd) {
-      dateEnd = parseDateTime(req.body.dateEnd, req.body.timeEnd);
-    }
+  // Parse date and time inputs if they are provided
+  let dateStart, dateEnd;
+  if (req.body.dateStart && req.body.timeStart) {
+    dateStart = parseDateTime(req.body.dateStart, req.body.timeStart);
+  }
+  if (req.body.dateEnd && req.body.timeEnd) {
+    dateEnd = parseDateTime(req.body.dateEnd, req.body.timeEnd);
+  }
 
-    // Prepare the update object
-    const updateObject = {
-      name: req.body.name || event.name,
-      location: req.body.location || event.location,
-      description: req.body.description || event.description,
-      images: updatedImages,
-      organization: req.body.organization || event.organization,
-      dateStart: dateStart || event.dateStart,
-      dateEnd: dateEnd || event.dateEnd,
-      userId: req.body.userId || event.userId,
-      userName: req.body.userName || event.userName
-    };
+  // Prepare the update object
+  const updateObject = {
+    name: req.body.name || event.name,
+    location: req.body.location || event.location,
+    description: req.body.description || event.description,
+    images: updatedImages,
+    organization: req.body.organization || event.organization,
+    userId: req.body.userId || event.userId,
+    userName: req.body.userName || event.userName
+  };
 
-    const updatedEvent = await Event.findByIdAndUpdate(
-      eventId,
-      updateObject,
-      { new: true }
-    );
+  // Only update dates if new values are provided
+  if (dateStart) updateObject.dateStart = dateStart;
+  if (dateEnd) updateObject.dateEnd = dateEnd;
+
+  const updatedEvent = await Event.findByIdAndUpdate(
+    eventId,
+    updateObject,
+    { new: true }
+  );
 
     res.status(200).json({ success: true, event: updatedEvent });
   } catch (error) {
