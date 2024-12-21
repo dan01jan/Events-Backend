@@ -26,18 +26,23 @@ const eventRoutes = require("./routes/event")
 const questionnaireRoutes = require('./routes/questionnaire');
 const sentimentRoutes = require("./routes/sentiment");
 const courseRoutes = require("./routes/course");
+const ratingRoutes = require("./routes/rating");
+const traitRoutes = require("./routes/trait")
+const questionRoutes = require("./routes/question")
+const responseRoutes = require("./routes/response")
 
 
 const api = process.env.API_URL;
 
-// app.use(`${api}/categories`, categoriesRoutes);
-// app.use(`${api}/products`, productsRoutes);
 app.use(`${api}/users`, usersRoutes);
-app.use('/api/v1/questionnaires', questionnaireRoutes);
+app.use(`${api}/questionnaires`, questionnaireRoutes);
 app.use(`${api}/sentiments`, sentimentRoutes);
-// app.use(`${api}/orders`, ordersRoutes);
 app.use(`${api}/events`, eventRoutes);
 app.use(`${api}/course`, courseRoutes);
+app.use(`${api}/ratings`, ratingRoutes);
+app.use(`${api}/traits`, traitRoutes);
+app.use(`${api}/questions`, questionRoutes);
+app.use(`${api}/responses`, responseRoutes);
 app.get("/", (req, res) => {
   res.send("Server is running");
 });

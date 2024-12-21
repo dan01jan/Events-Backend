@@ -32,6 +32,18 @@ function authJwt() {
                     url: /\/api\/v1\/course(.*)/,
                     methods: ['GET', 'POST', 'PUT', 'DELETE','OPTIONS']
                 },
+                {
+                    url: /\/api\/v1\/traits(.*)/,
+                    methods: ['GET', 'POST', 'PUT', 'DELETE','OPTIONS']
+                },
+                {
+                    url: /\/api\/v1\/questions(.*)/,
+                    methods: ['GET', 'POST', 'PUT', 'DELETE','OPTIONS']
+                },
+                {
+                    url: /\/api\/v1\/responses(.*)/,
+                    methods: ['GET', 'POST', 'PUT', 'DELETE','OPTIONS']
+                },
                 `${api}/users`,
                 `${api}/users/login`,
                 `${api}/users/register`,
